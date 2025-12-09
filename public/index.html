@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wallet Service Demo</title>
+  <style>
+    :root {
+      --bg: #0b1120;
+      --panel: #0f172a;
+      --card: #0f172a;
+      --border: #1f2a44;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #22d3ee;
+      --accent-2: #6366f1;
+      --error: #f87171;
+      font-family: "Inter", "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background: radial-gradient(circle at 20% 20%, rgba(34, 211, 238, 0.08), transparent 26%),
+                  radial-gradient(circle at 80% 0%, rgba(99, 102, 241, 0.1), transparent 32%),
+                  var(--bg);
+      min-height: 100vh;
+    }
+    header {
+      background: linear-gradient(135deg, rgba(34, 211, 238, 0.12), rgba(99, 102, 241, 0.18));
+      border-bottom: 1px solid var(--border);
+      padding: 24px 22px 18px;
+    }
+    h1 {
+      margin: 0 0 4px;
+      font-size: 24px;
+      letter-spacing: -0.01em;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      max-width: 720px;
+    }
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 22px;
+      box-sizing: border-box;
+    }
+    main {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 16px;
+    }
+    section {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.0));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 16px 18px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    }
+    section h2 {
+      margin: 0 0 10px;
+      font-size: 16px;
+      letter-spacing: 0.01em;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      margin: 10px 0 4px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    input, select, button, textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 9px 11px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+      background: var(--card);
+      color: var(--text);
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: 2px solid rgba(99, 102, 241, 0.5);
+      border-color: rgba(99, 102, 241, 0.5);
+    }
+    button {
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #0b1120;
+      border: none;
+      margin-top: 10px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      transition: transform 120ms ease, box-shadow 160ms ease, filter 120ms ease;
+      box-shadow: 0 12px 30px rgba(34, 211, 238, 0.35);
+    }
+    button:hover { transform: translateY(-1px); filter: brightness(1.05); }
+    button:active { transform: translateY(0); filter: brightness(0.98); }
+    .row { display: flex; gap: 10px; }
+    .row > * { flex: 1; }
+    .pill {
+      display: inline-block;
+      padding: 6px 10px;
+      background: rgba(34, 211, 238, 0.14);
+      border: 1px solid rgba(34, 211, 238, 0.35);
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--text);
+      margin-right: 6px;
+    }
+    #log {
+      min-height: 240px;
+      background: #050915;
+      color: #e2e8f0;
+      padding: 12px;
+      border-radius: 10px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      box-shadow: inset 0 0 0 1px #1e293b;
+      border: 1px solid var(--border);
+    }
+    .small { font-size: 12px; color: var(--muted); }
+    .tagline {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(34, 211, 238, 0.12);
+      border: 1px solid rgba(34, 211, 238, 0.3);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      margin-top: 6px;
+    }
+  </style>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <header>
+    <div class="page">
+      <h1>Wallet Service Demo</h1>
+      <div class="subtitle">End-to-end testbed for auth, deposits, transfers, API keys, and webhooks.</div>
+      <div class="tagline">
+        <span class="pill">JWT</span>
+        <span class="pill">API Keys</span>
+        <span class="pill">Paystack</span>
+        <span class="pill">Transfers</span>
+      </div>
+    </div>
+  </header>
+  <div class="page">
+    <main>
+      <section>
+        <h2>Auth & Tokens</h2>
+        <label>Email (mock Google)</label>
+        <input id="mock-email" placeholder="you@example.com" />
+        <div class="row">
+          <button id="btn-mock-login">Mock Login (JWT)</button>
+          <button id="btn-clear">Clear Tokens</button>
+        </div>
+        <label>Google Sign-In (real)</label>
+        <div id="google-btn"></div>
+        <div class="small" id="google-status"></div>
+        <label>Bearer JWT</label>
+        <input id="token" placeholder="autofilled after login" />
+        <label>API Key</label>
+        <input id="api-key" placeholder="paste or create below" />
+        <div class="small">Auth priority: JWT if present, else x-api-key.</div>
+      </section>
+
+      <section>
+        <h2>Create API Key</h2>
+        <label>Name</label>
+        <input id="key-name" placeholder="wallet-service" />
+        <label>Permissions</label>
+        <div class="row">
+          <label><input type="checkbox" id="perm-read" checked /> read</label>
+          <label><input type="checkbox" id="perm-deposit" checked /> deposit</label>
+          <label><input type="checkbox" id="perm-transfer" checked /> transfer</label>
+        </div>
+        <label>Expiry</label>
+        <select id="key-expiry">
+          <option value="1H">1H</option>
+          <option value="1D" selected>1D</option>
+          <option value="1M">1M</option>
+          <option value="1Y">1Y</option>
+        </select>
+        <button id="btn-create-key">Create API Key</button>
+        <div class="small">Requires JWT (user) auth.</div>
+      </section>
+
+      <section>
+        <h2>Wallet Deposit</h2>
+        <label>Amount</label>
+        <input id="deposit-amount" type="number" placeholder="5000" />
+        <button id="btn-deposit">Initialize Deposit</button>
+        <label class="small">Reference</label>
+        <input id="deposit-ref" placeholder="ref will appear here" />
+        <button id="btn-deposit-status">Check Deposit Status</button>
+      </section>
+
+      <section>
+        <h2>Balance & History</h2>
+        <button id="btn-balance">Get Balance</button>
+        <button id="btn-history">Get Transactions</button>
+      </section>
+
+      <section>
+        <h2>Transfer</h2>
+        <label>Destination Wallet Number</label>
+        <input id="transfer-wallet" placeholder="recipient wallet number" />
+        <label>Amount</label>
+        <input id="transfer-amount" type="number" placeholder="3000" />
+        <button id="btn-transfer">Send</button>
+      </section>
+
+      <section>
+        <h2>Logs</h2>
+        <div id="log">Ready.</div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const state = { token: '', apiKey: '' };
+      const logEl = document.getElementById('log');
+      const tokenInput = document.getElementById('token');
+      const apiKeyInput = document.getElementById('api-key');
+      const googleStatus = document.getElementById('google-status');
+
+      function log(title, data) {
+        const line = data !== undefined ? `${title}: ${JSON.stringify(data, null, 2)}` : title;
+        logEl.textContent = `${new Date().toISOString()} - ${line}\n\n${logEl.textContent}`;
+      }
+
+      function setToken(token) {
+        state.token = token || '';
+        tokenInput.value = state.token;
+      }
+      function setApiKey(key) {
+        state.apiKey = key || '';
+        apiKeyInput.value = state.apiKey;
+      }
+
+      function authHeaders() {
+        const h = {};
+        if (state.token) {
+          h.Authorization = `Bearer ${state.token}`;
+        } else if (state.apiKey) {
+          h['x-api-key'] = state.apiKey;
+        }
+        return h;
+      }
+
+      async function apiCall(path, { method = 'GET', body } = {}) {
+        const opts = { method, headers: { ...authHeaders() } };
+        if (body !== undefined) {
+          opts.body = JSON.stringify(body);
+          opts.headers['Content-Type'] = 'application/json';
+        }
+        const res = await fetch(path, opts);
+        const text = await res.text();
+        let json;
+        try { json = JSON.parse(text); } catch { json = text; }
+        if (!res.ok) throw { status: res.status, body: json };
+        return json;
+      }
+
+      async function fetchPublicConfig() {
+        try {
+          const res = await fetch('/config/public');
+          return await res.json();
+        } catch (err) {
+          log('Failed to fetch public config', err);
+          return {};
+        }
+      }
+
+      async function initGoogleSignIn() {
+        const cfg = await fetchPublicConfig();
+        if (!cfg.googleClientId) {
+          googleStatus.textContent = 'Google client ID not set on server.';
+          return;
+        }
+        const ensureGoogleReady = (retries = 20) =>
+          new Promise((resolve, reject) => {
+            if (window.google?.accounts?.id) return resolve();
+            if (retries <= 0) return reject(new Error('Google script not loaded'));
+            setTimeout(() => ensureGoogleReady(retries - 1).then(resolve).catch(reject), 200);
+          });
+        try {
+          await ensureGoogleReady();
+          window.google.accounts.id.initialize({
+            client_id: cfg.googleClientId,
+            callback: async (response) => {
+              if (!response.credential) {
+                log('Google sign-in failed', response);
+                return;
+              }
+              try {
+                log('Received Google id_token', { length: response.credential.length });
+                const data = await apiCall(
+                  `/auth/google/callback?id_token=${encodeURIComponent(response.credential)}`,
+                );
+                setToken(data.token);
+                log('Google login success', { user: data.user, wallet: data.wallet });
+              } catch (err) {
+                log('Google login failed', err);
+              }
+            },
+          });
+          window.google.accounts.id.renderButton(document.getElementById('google-btn'), {
+            theme: 'outline',
+            size: 'large',
+            width: '100%',
+          });
+          googleStatus.textContent = 'Sign in with Google to auto-fill JWT.';
+        } catch (err) {
+          googleStatus.textContent = 'Google script not loaded.';
+          log('Google init failed', err);
+        }
+      }
+
+      document.getElementById('btn-mock-login').addEventListener('click', async () => {
+        const email = document.getElementById('mock-email').value.trim();
+        if (!email) return log('Error', 'Email is required for mock login');
+        try {
+          const data = await apiCall(`/auth/google/callback?email=${encodeURIComponent(email)}`);
+          setToken(data.token);
+          log('Mock login success', { user: data.user, wallet: data.wallet });
+        } catch (err) {
+          log('Login failed', err);
+        }
+      });
+
+      document.getElementById('btn-clear').addEventListener('click', () => {
+        setToken('');
+        setApiKey('');
+        log('Cleared tokens');
+      });
+
+      tokenInput.addEventListener('input', (e) => setToken(e.target.value));
+      apiKeyInput.addEventListener('input', (e) => setApiKey(e.target.value));
+
+      document.getElementById('btn-create-key').addEventListener('click', async () => {
+        const name = document.getElementById('key-name').value.trim() || 'wallet-service';
+        const perms = [];
+        if (document.getElementById('perm-read').checked) perms.push('read');
+        if (document.getElementById('perm-deposit').checked) perms.push('deposit');
+        if (document.getElementById('perm-transfer').checked) perms.push('transfer');
+        const expiry = document.getElementById('key-expiry').value;
+        try {
+          const data = await apiCall('/keys/create', {
+            method: 'POST',
+            body: { name, permissions: perms, expiry },
+          });
+          setApiKey(data.api_key);
+          log('API key created', data);
+        } catch (err) {
+          log('Create key failed', err);
+        }
+      });
+
+      document.getElementById('btn-deposit').addEventListener('click', async () => {
+        const amt = Number(document.getElementById('deposit-amount').value);
+        if (!Number.isFinite(amt) || amt <= 0) return log('Error', 'Amount must be positive');
+        try {
+          const data = await apiCall('/wallet/deposit', { method: 'POST', body: { amount: amt } });
+          document.getElementById('deposit-ref').value = data.reference;
+          log('Deposit initialized', data);
+        } catch (err) {
+          log('Deposit init failed', err);
+        }
+      });
+
+      document.getElementById('btn-deposit-status').addEventListener('click', async () => {
+        const ref = document.getElementById('deposit-ref').value.trim();
+        if (!ref) return log('Error', 'Reference required');
+        try {
+          const data = await apiCall(`/wallet/deposit/${encodeURIComponent(ref)}/status`);
+          log('Deposit status', data);
+        } catch (err) {
+          log('Deposit status failed', err);
+        }
+      });
+
+      document.getElementById('btn-balance').addEventListener('click', async () => {
+        try {
+          const data = await apiCall('/wallet/balance');
+          log('Balance', data);
+        } catch (err) {
+          log('Balance failed', err);
+        }
+      });
+
+      document.getElementById('btn-history').addEventListener('click', async () => {
+        try {
+          const data = await apiCall('/wallet/transactions');
+          log('Transactions', data);
+        } catch (err) {
+          log('History failed', err);
+        }
+      });
+
+      document.getElementById('btn-transfer').addEventListener('click', async () => {
+        const wallet = document.getElementById('transfer-wallet').value.trim();
+        const amt = Number(document.getElementById('transfer-amount').value);
+        if (!wallet || !Number.isFinite(amt) || amt <= 0) return log('Error', 'Wallet and amount required');
+        try {
+          const data = await apiCall('/wallet/transfer', {
+            method: 'POST',
+            body: { wallet_number: wallet, amount: amt },
+          });
+          log('Transfer success', data);
+        } catch (err) {
+          log('Transfer failed', err);
+        }
+      });
+
+      // Initialize Google sign-in button on load.
+      window.addEventListener('load', initGoogleSignIn);
+    })();
+  </script>
+</body>
+</html>
