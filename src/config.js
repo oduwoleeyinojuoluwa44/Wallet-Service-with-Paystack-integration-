@@ -13,6 +13,11 @@ const config = {
   googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URL || '',
   allowPaystackStub: process.env.ALLOW_PAYSTACK_STUB === 'true',
   allowInsecureGoogleMock: process.env.ALLOW_INSECURE_GOOGLE_MOCK === 'true',
+  databaseUrl:
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_CONNECTION_STRING ||
+    '',
 };
 
 module.exports = { config };

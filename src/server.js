@@ -10,6 +10,7 @@ const {
 } = require('./auth');
 const store = require('./store');
 const { initializeDeposit, verifySignature } = require('./paystack');
+const { initDb } = require('./db');
 
 const app = express();
 
@@ -401,7 +402,15 @@ app.get(
 );
 
 const port = config.port || 3000;
-app.listen(port, () => {
-  // eslint-disable-next-line no-console
-  console.log(`Wallet service listening on port ${port}`);
-});
+initDb()
+  .then(() => {
+    app.listen(port, () => {
+      // eslint-disable-next-line no-console
+      console.log(`Wallet service listening on port ${port}`);
+    });
+  })
+  .catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('Failed to initialize database', err);
+    process.exit(1);
+  });

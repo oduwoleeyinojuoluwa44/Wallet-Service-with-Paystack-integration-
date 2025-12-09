@@ -16,8 +16,8 @@ Simple wallet backend with Paystack deposits, JWT/API key auth, and a lightweigh
 - Paystack: webhook is at `/wallet/paystack/webhook`; only the webhook credits wallets.
 
 ## Deploy (Railway or similar)
-- Ensure env vars are set: `JWT_SECRET`, `PAYSTACK_SECRET_KEY`, `PAYSTACK_PUBLIC_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_REDIRECT_URI` (e.g., `https://your-app.up.railway.app/auth/google/callback`), `ALLOW_PAYSTACK_STUB=false`.
+- Ensure env vars are set: `JWT_SECRET`, `PAYSTACK_SECRET_KEY`, `PAYSTACK_PUBLIC_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_REDIRECT_URI` (e.g., `https://your-app.up.railway.app/auth/google/callback`), `ALLOW_PAYSTACK_STUB=false`, **`DATABASE_URL` (Postgres connection string)**.
 - Use start command: `npm start` (package.json main is `src/server.js`; Node >=18).
 - Set the Paystack webhook to `https://<your-domain>/wallet/paystack/webhook` (must be HTTPS and reachable).
 - Update your Google OAuth client authorized redirect URI to match the deployed domain/callback.
-- Storage is in-memory; data resets on restart. Add a DB if you need persistence.
+- Storage: now uses Postgres (`DATABASE_URL`). On Railway, add a Postgres service and set `DATABASE_URL` from its connection string.
