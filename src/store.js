@@ -1,4 +1,4 @@
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 const users = [];
 const wallets = [];
@@ -34,7 +34,7 @@ function ensureWallet(userId) {
   const existing = wallets.find((w) => w.userId === userId);
   if (existing) return existing;
   const wallet = {
-    id: uuidv4(),
+    id: randomUUID(),
     userId,
     walletNumber: generateWalletNumber(),
     balance: 0,
@@ -53,7 +53,7 @@ function createUser({ email, name, googleId }) {
   const existing = findUserByEmail(email);
   if (existing) return existing;
   const user = {
-    id: uuidv4(),
+    id: randomUUID(),
     email,
     name: name || email,
     googleId,
@@ -77,8 +77,8 @@ function listActiveApiKeysForUser(userId) {
 }
 
 function createApiKey(userId, { name, permissions, expiresAt }) {
-  const id = uuidv4().replace(/-/g, '');
-  const keyValue = `sk_live_${uuidv4().replace(/-/g, '')}`;
+  const id = randomUUID().replace(/-/g, '');
+  const keyValue = `sk_live_${randomUUID().replace(/-/g, '')}`;
   const record = {
     id,
     userId,
@@ -110,9 +110,9 @@ function updateApiKey(id, updates) {
 }
 
 function createTransaction(tx) {
-  const reference = tx.reference || `tx_${uuidv4().replace(/-/g, '')}`;
+  const reference = tx.reference || `tx_${randomUUID().replace(/-/g, '')}`;
   const record = {
-    id: uuidv4(),
+    id: randomUUID(),
     ...tx,
     reference,
     createdAt: nowIso(),
