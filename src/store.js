@@ -1,10 +1,15 @@
 const { randomUUID } = require('crypto');
 const { pool } = require('./db');
+const crypto = require('crypto');
 
 const permittedPermissions = ['deposit', 'transfer', 'read'];
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function hashApiKey(keyValue) {
+  return crypto.createHash('sha256').update(keyValue).digest('hex');
 }
 
 function camelize(row) {
@@ -151,6 +156,7 @@ async function createApiKey(userId, { name, permissions, expiresAt }) {
     created_at: nowIso(),
     updated_at: nowIso(),
   };
+  const keyHash = hashApiKey(record.key);
   await pool.query(
     `INSERT INTO api_keys (id, user_id, name, permissions, key, revoked, expires_at, created_at, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
@@ -159,7 +165,7 @@ async function createApiKey(userId, { name, permissions, expiresAt }) {
       record.user_id,
       record.name,
       JSON.stringify(record.permissions),
-      record.key,
+      keyHash,
       record.revoked,
       record.expires_at,
       record.created_at,
@@ -180,7 +186,8 @@ async function createApiKey(userId, { name, permissions, expiresAt }) {
 }
 
 async function findApiKey(keyValue) {
-  const { rows } = await pool.query('SELECT * FROM api_keys WHERE key = $1', [keyValue]);
+  const keyHash = hashApiKey(keyValue);
+  const { rows } = await pool.query('SELECT * FROM api_keys WHERE key = $1', [keyHash]);
   if (!rows[0]) return undefined;
   return camelize(rows[0]);
 }
@@ -202,6 +209,8 @@ async function updateApiKey(id, updates) {
   const permissionsToStore = JSON.stringify(
     Array.isArray(merged.permissions) ? merged.permissions : current.permissions,
   );
+  const keyToStore =
+    typeof updates.key === 'string' ? hashApiKey(updates.key) : current.key;
   await pool.query(
     `UPDATE api_keys
      SET name = $1,
@@ -211,17 +220,9 @@ async function updateApiKey(id, updates) {
          expires_at = $5,
          updated_at = $6
      WHERE id = $7`,
-    [
-      merged.name,
-      permissionsToStore,
-      merged.key,
-      merged.revoked,
-      merged.expires_at,
-      merged.updated_at,
-      id,
-    ],
+    [merged.name, permissionsToStore, keyToStore, merged.revoked, merged.expires_at, merged.updated_at, id],
   );
-  return camelize({ ...merged, permissions: permissionsToStore });
+  return camelize({ ...merged, permissions: permissionsToStore, key: keyToStore });
 }
 
 async function createTransaction(tx) {
