@@ -312,8 +312,10 @@ app.post(
   requirePermission('deposit'),
   async (req, res) => {
     const amount = Number(req.body.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({ error: 'amount must be a positive number' });
+    if (!Number.isInteger(amount) || amount < 100) {
+      return res
+        .status(400)
+        .json({ error: 'amount must be an integer of at least 100 (no decimals)' });
     }
 
     const reference = await generateReference('dep');
@@ -377,8 +379,10 @@ app.post(
   async (req, res) => {
     const { wallet_number: walletNumber, amount } = req.body;
     const transferAmount = Number(amount);
-    if (!Number.isFinite(transferAmount) || transferAmount <= 0) {
-      return res.status(400).json({ error: 'amount must be a positive number' });
+    if (!Number.isInteger(transferAmount) || transferAmount < 100) {
+      return res
+        .status(400)
+        .json({ error: 'amount must be an integer of at least 100 (no decimals)' });
     }
 
     const senderWallet = await store.ensureWallet(req.auth.user.id);
