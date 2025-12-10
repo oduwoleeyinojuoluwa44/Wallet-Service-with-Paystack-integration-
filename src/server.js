@@ -161,7 +161,7 @@ app.get('/auth/google', (req, res) => {
         config.googleClientId,
       )}&redirect_uri=${encodeURIComponent(
         redirectUri,
-      )}&response_type=token&scope=${encodeURIComponent(scope)}`
+      )}&response_type=id_token&scope=${encodeURIComponent(scope)}&nonce=walletdemo`
     : null;
 
   if (req.query.redirect === 'true' && authUrl) {
