@@ -22,7 +22,7 @@ async function verifyGoogleIdToken(idToken) {
   return ticket.getPayload();
 }
 
-function authenticate(req, res, next) {
+async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization || '';
   const apiKeyHeader = req.headers['x-api-key'] || '';
 
@@ -30,7 +30,7 @@ function authenticate(req, res, next) {
     const token = authHeader.split(' ')[1];
     try {
       const payload = jwt.verify(token, config.jwtSecret);
-      const user = store.getUserById(payload.sub);
+      const user = await store.getUserById(payload.sub);
       if (!user) {
         return res.status(401).json({ error: 'User not found for token' });
       }
@@ -42,7 +42,7 @@ function authenticate(req, res, next) {
   }
 
   if (apiKeyHeader) {
-    const apiKeyRecord = store.findApiKey(apiKeyHeader);
+    const apiKeyRecord = await store.findApiKey(apiKeyHeader);
     if (!apiKeyRecord) {
       return res.status(401).json({ error: 'Invalid API key' });
     }
@@ -52,7 +52,7 @@ function authenticate(req, res, next) {
     if (new Date(apiKeyRecord.expiresAt) <= new Date()) {
       return res.status(401).json({ error: 'API key expired' });
     }
-    const user = store.getUserById(apiKeyRecord.userId);
+    const user = await store.getUserById(apiKeyRecord.userId);
     if (!user) {
       return res.status(401).json({ error: 'User missing for API key' });
     }

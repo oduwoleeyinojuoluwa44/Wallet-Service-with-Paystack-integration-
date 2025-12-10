@@ -7,6 +7,35 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function camelize(row) {
+  if (!row || typeof row !== 'object') return row;
+  const map = {
+    user_id: 'userId',
+    google_id: 'googleId',
+    wallet_number: 'walletNumber',
+    from_user_id: 'fromUserId',
+    to_user_id: 'toUserId',
+    expires_at: 'expiresAt',
+    created_at: 'createdAt',
+    updated_at: 'updatedAt',
+    webhook_event: 'webhookEvent',
+    gateway_response: 'gatewayResponse',
+  };
+  const out = {};
+  Object.keys(row).forEach((k) => {
+    const nk = map[k] || k;
+    out[nk] = row[k];
+  });
+  if (out.permissions && typeof out.permissions === 'string') {
+    try {
+      out.permissions = JSON.parse(out.permissions);
+    } catch {
+      out.permissions = [];
+    }
+  }
+  return out;
+}
+
 async function generateWalletNumber() {
   let candidate = '';
   while (true) {
@@ -24,12 +53,12 @@ async function generateWalletNumber() {
 
 async function findUserByEmail(email) {
   const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-  return rows[0];
+  return camelize(rows[0]);
 }
 
 async function getUserById(id) {
   const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
-  return rows[0];
+  return camelize(rows[0]);
 }
 
 async function createUser({ email, name, googleId }) {
@@ -54,12 +83,12 @@ async function createUser({ email, name, googleId }) {
 
 async function listUsers() {
   const { rows } = await pool.query('SELECT * FROM users');
-  return rows;
+  return rows.map(camelize);
 }
 
 async function ensureWallet(userId) {
   const existing = await pool.query('SELECT * FROM wallets WHERE user_id = $1', [userId]);
-  if (existing.rowCount > 0) return existing.rows[0];
+  if (existing.rowCount > 0) return camelize(existing.rows[0]);
   const walletNumber = await generateWalletNumber();
   const wallet = {
     id: randomUUID(),
@@ -81,14 +110,21 @@ async function ensureWallet(userId) {
       wallet.updated_at,
     ],
   );
-  return wallet;
+  return {
+    id: wallet.id,
+    userId: wallet.user_id,
+    walletNumber: wallet.wallet_number,
+    balance: wallet.balance,
+    createdAt: wallet.created_at,
+    updatedAt: wallet.updated_at,
+  };
 }
 
 async function findWalletByNumber(walletNumber) {
   const { rows } = await pool.query('SELECT * FROM wallets WHERE wallet_number = $1', [
     walletNumber,
   ]);
-  return rows[0];
+  return camelize(rows[0]);
 }
 
 async function listActiveApiKeysForUser(userId) {
@@ -100,7 +136,7 @@ async function listActiveApiKeysForUser(userId) {
        AND expires_at > $2`,
     [userId, now],
   );
-  return rows.map((r) => ({ ...r, permissions: JSON.parse(r.permissions) }));
+  return rows.map(camelize);
 }
 
 async function createApiKey(userId, { name, permissions, expiresAt }) {
@@ -130,19 +166,29 @@ async function createApiKey(userId, { name, permissions, expiresAt }) {
       record.updated_at,
     ],
   );
-  return record;
+  return {
+    id: record.id,
+    userId: record.user_id,
+    name: record.name,
+    permissions: record.permissions,
+    key: record.key,
+    revoked: record.revoked,
+    expiresAt: record.expires_at,
+    createdAt: record.created_at,
+    updatedAt: record.updated_at,
+  };
 }
 
 async function findApiKey(keyValue) {
   const { rows } = await pool.query('SELECT * FROM api_keys WHERE key = $1', [keyValue]);
   if (!rows[0]) return undefined;
-  return { ...rows[0], permissions: JSON.parse(rows[0].permissions) };
+  return camelize(rows[0]);
 }
 
 async function findApiKeyById(id) {
   const { rows } = await pool.query('SELECT * FROM api_keys WHERE id = $1', [id]);
   if (!rows[0]) return undefined;
-  return { ...rows[0], permissions: JSON.parse(rows[0].permissions) };
+  return camelize(rows[0]);
 }
 
 async function updateApiKey(id, updates) {
@@ -175,7 +221,7 @@ async function updateApiKey(id, updates) {
       id,
     ],
   );
-  return { ...merged, permissions: JSON.parse(permissionsToStore) };
+  return camelize({ ...merged, permissions: permissionsToStore });
 }
 
 async function createTransaction(tx) {
@@ -217,14 +263,28 @@ async function createTransaction(tx) {
       record.updated_at,
     ],
   );
-  return record;
+  return camelize({
+    reference: record.reference,
+    type: record.type,
+    userId: record.user_id,
+    fromUserId: record.from_user_id,
+    toUserId: record.to_user_id,
+    amount: record.amount,
+    status: record.status,
+    source: record.source,
+    webhookEvent: record.webhook_event,
+    gatewayResponse: record.gateway_response,
+    error: record.error,
+    createdAt: record.created_at,
+    updatedAt: record.updated_at,
+  });
 }
 
 async function findTransactionByReference(reference) {
   const { rows } = await pool.query('SELECT * FROM transactions WHERE reference = $1', [
     reference,
   ]);
-  return rows[0];
+  return camelize(rows[0]);
 }
 
 async function updateTransaction(reference, updates) {
@@ -260,7 +320,7 @@ async function updateTransaction(reference, updates) {
       merged.reference,
     ],
   );
-  return merged;
+  return camelize(merged);
 }
 
 async function listTransactionsForUser(userId) {
@@ -272,7 +332,7 @@ async function listTransactionsForUser(userId) {
      ORDER BY created_at DESC`,
     [userId],
   );
-  return rows;
+  return rows.map(camelize);
 }
 
 async function adjustWalletBalance(userId, delta) {

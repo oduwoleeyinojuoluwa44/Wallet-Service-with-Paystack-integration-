@@ -20,7 +20,7 @@ const app = express();
 app.post(
   '/wallet/paystack/webhook',
   express.raw({ type: 'application/json' }),
-  (req, res) => {
+  async (req, res) => {
     const signature = req.headers['x-paystack-signature'];
     const rawBody = req.body;
 
@@ -40,7 +40,7 @@ app.post(
       return res.status(400).json({ error: 'Missing transaction reference' });
     }
 
-    const tx = store.findTransactionByReference(reference);
+    const tx = await store.findTransactionByReference(reference);
     if (!tx) {
       return res.status(404).json({ error: 'Transaction not found' });
     }
@@ -50,7 +50,7 @@ app.post(
     }
 
     if (payload?.data?.status !== 'success') {
-      store.updateTransaction(reference, {
+      await store.updateTransaction(reference, {
         status: 'failed',
         webhookEvent: payload.event,
       });
@@ -60,13 +60,13 @@ app.post(
     const amountFromWebhook = Math.round((payload?.data?.amount || 0) / 100);
     const creditAmount = amountFromWebhook || tx.amount || 0;
 
-    store.updateTransaction(reference, {
+    await store.updateTransaction(reference, {
       status: 'success',
       amount: tx.amount || creditAmount,
       webhookEvent: payload.event,
       gatewayResponse: payload?.data?.gateway_response,
     });
-    store.adjustWalletBalance(tx.userId, creditAmount);
+    await store.adjustWalletBalance(tx.userId, creditAmount);
 
     return res.json({ status: true });
   },
@@ -85,15 +85,33 @@ app.get('/config/public', (req, res) => {
 });
 
 // Swagger/OpenAPI docs
-app.get('/openapi.json', (req, res) => res.json(apiSpec));
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(apiSpec));
+function buildSpec(req) {
+  const hostUrl = `${req.protocol}://${req.get('host')}`;
+  return { ...apiSpec, servers: [{ url: hostUrl }] };
+}
+
+app.get('/openapi.json', (req, res) => res.json(buildSpec(req)));
+app.use('/docs', swaggerUi.serve, (req, res, next) => {
+  const hostUrl = `${req.protocol}://${req.get('host')}`;
+  const swaggerOpts = {
+    swaggerUrl: '/openapi.json',
+    explorer: false,
+    oauth: {
+      redirectUrl: `${hostUrl}/docs/oauth2-redirect.html`,
+    },
+  };
+  return swaggerUi.setup(null, swaggerOpts)(req, res, next);
+});
 
 function generateReference(prefix) {
-  let reference;
-  do {
-    reference = `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  } while (store.findTransactionByReference(reference));
-  return reference;
+  // Keep trying until unique in DB
+  const randRef = () => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  return (async function loop() {
+    const ref = randRef();
+    const existing = await store.findTransactionByReference(ref);
+    if (!existing) return ref;
+    return loop();
+  })();
 }
 
 function parseExpiryToDate(expiry) {
@@ -164,17 +182,17 @@ app.get('/auth/google/callback', async (req, res) => {
     }
   }
 
-  const user = store.createUser({
+  const user = await store.createUser({
     email: payload.email,
     name: payload.name,
     googleId: payload.sub,
   });
-  const wallet = store.ensureWallet(user.id);
+  const wallet = await store.ensureWallet(user.id);
   const token = issueJwt(user);
   return res.json({ token, user, wallet });
 });
 
-app.post('/keys/create', authenticate, requireUserAuth, (req, res) => {
+app.post('/keys/create', authenticate, requireUserAuth, async (req, res) => {
   const { name, permissions, expiry } = req.body;
   if (!name || !Array.isArray(permissions) || !permissions.length || !expiry) {
     return res.status(400).json({ error: 'name, permissions, and expiry are required' });
@@ -193,14 +211,14 @@ app.post('/keys/create', authenticate, requireUserAuth, (req, res) => {
     return res.status(400).json({ error: 'Invalid expiry. Use 1H, 1D, 1M, or 1Y' });
   }
 
-  const activeKeys = store.listActiveApiKeysForUser(req.auth.user.id);
+  const activeKeys = await store.listActiveApiKeysForUser(req.auth.user.id);
   if (activeKeys.length >= 5) {
     return res
       .status(400)
       .json({ error: 'Maximum of 5 active API keys reached. Revoke or let one expire.' });
   }
 
-  const keyRecord = store.createApiKey(req.auth.user.id, {
+  const keyRecord = await store.createApiKey(req.auth.user.id, {
     name,
     permissions: validPermissions,
     expiresAt,
@@ -214,13 +232,13 @@ app.post('/keys/create', authenticate, requireUserAuth, (req, res) => {
   });
 });
 
-app.post('/keys/rollover', authenticate, requireUserAuth, (req, res) => {
+app.post('/keys/rollover', authenticate, requireUserAuth, async (req, res) => {
   const { expired_key_id: expiredKeyId, expiry } = req.body;
   if (!expiredKeyId || !expiry) {
     return res.status(400).json({ error: 'expired_key_id and expiry are required' });
   }
 
-  const oldKey = store.findApiKeyById(expiredKeyId);
+  const oldKey = await store.findApiKeyById(expiredKeyId);
   if (!oldKey || oldKey.userId !== req.auth.user.id) {
     return res.status(404).json({ error: 'Expired key not found for this user' });
   }
@@ -235,14 +253,14 @@ app.post('/keys/rollover', authenticate, requireUserAuth, (req, res) => {
     return res.status(400).json({ error: 'Invalid expiry. Use 1H, 1D, 1M, or 1Y' });
   }
 
-  const activeKeys = store.listActiveApiKeysForUser(req.auth.user.id);
+  const activeKeys = await store.listActiveApiKeysForUser(req.auth.user.id);
   if (activeKeys.length >= 5) {
     return res
       .status(400)
       .json({ error: 'Maximum of 5 active API keys reached. Revoke or let one expire.' });
   }
 
-  const newKey = store.createApiKey(req.auth.user.id, {
+  const newKey = await store.createApiKey(req.auth.user.id, {
     name: oldKey.name,
     permissions: oldKey.permissions,
     expiresAt,
@@ -256,19 +274,19 @@ app.post('/keys/rollover', authenticate, requireUserAuth, (req, res) => {
   });
 });
 
-app.post('/keys/revoke', authenticate, requireUserAuth, (req, res) => {
+app.post('/keys/revoke', authenticate, requireUserAuth, async (req, res) => {
   const { api_key: apiKeyValue } = req.body;
   if (!apiKeyValue) {
     return res.status(400).json({ error: 'api_key is required' });
   }
-  const record = store.findApiKey(apiKeyValue);
+  const record = await store.findApiKey(apiKeyValue);
   if (!record || record.userId !== req.auth.user.id) {
     return res.status(404).json({ error: 'API key not found for this user' });
   }
   if (record.revoked) {
     return res.json({ status: 'already_revoked', id: record.id });
   }
-  store.updateApiKey(record.id, { revoked: true });
+  await store.updateApiKey(record.id, { revoked: true });
   return res.json({ status: 'revoked', id: record.id });
 });
 
@@ -282,10 +300,10 @@ app.post(
       return res.status(400).json({ error: 'amount must be a positive number' });
     }
 
-    const reference = generateReference('dep');
+    const reference = await generateReference('dep');
     const user = req.auth.user;
 
-    store.createTransaction({
+    await store.createTransaction({
       reference,
       type: 'deposit',
       userId: user.id,
@@ -305,7 +323,7 @@ app.post(
         authorization_url: response.authorization_url,
       });
     } catch (err) {
-      store.updateTransaction(reference, { status: 'failed', error: err.message });
+      await store.updateTransaction(reference, { status: 'failed', error: err.message });
       return res.status(502).json({ error: 'Failed to initialize Paystack deposit' });
     }
   },
@@ -315,8 +333,8 @@ app.get(
   '/wallet/deposit/:reference/status',
   authenticate,
   requirePermission('read'),
-  (req, res) => {
-    const tx = store.findTransactionByReference(req.params.reference);
+  async (req, res) => {
+    const tx = await store.findTransactionByReference(req.params.reference);
     if (!tx || tx.type !== 'deposit') {
       return res.status(404).json({ error: 'Deposit not found' });
     }
@@ -331,8 +349,8 @@ app.get(
   },
 );
 
-app.get('/wallet/balance', authenticate, requirePermission('read'), (req, res) => {
-  const wallet = store.ensureWallet(req.auth.user.id);
+app.get('/wallet/balance', authenticate, requirePermission('read'), async (req, res) => {
+  const wallet = await store.ensureWallet(req.auth.user.id);
   return res.json({ balance: wallet.balance, wallet_number: wallet.walletNumber });
 });
 
@@ -340,19 +358,19 @@ app.post(
   '/wallet/transfer',
   authenticate,
   requirePermission('transfer'),
-  (req, res) => {
+  async (req, res) => {
     const { wallet_number: walletNumber, amount } = req.body;
     const transferAmount = Number(amount);
     if (!Number.isFinite(transferAmount) || transferAmount <= 0) {
       return res.status(400).json({ error: 'amount must be a positive number' });
     }
 
-    const senderWallet = store.ensureWallet(req.auth.user.id);
+    const senderWallet = await store.ensureWallet(req.auth.user.id);
     if (senderWallet.balance < transferAmount) {
       return res.status(400).json({ error: 'Insufficient balance' });
     }
 
-    const receiverWallet = store.findWalletByNumber(walletNumber);
+    const receiverWallet = await store.findWalletByNumber(walletNumber);
     if (!receiverWallet) {
       return res.status(404).json({ error: 'Recipient wallet not found' });
     }
@@ -361,11 +379,11 @@ app.post(
       return res.status(400).json({ error: 'Cannot transfer to your own wallet' });
     }
 
-    store.adjustWalletBalance(req.auth.user.id, -transferAmount);
-    store.adjustWalletBalance(receiverWallet.userId, transferAmount);
+    await store.adjustWalletBalance(req.auth.user.id, -transferAmount);
+    await store.adjustWalletBalance(receiverWallet.userId, transferAmount);
 
-    const reference = generateReference('trf');
-    store.createTransaction({
+    const reference = await generateReference('trf');
+    await store.createTransaction({
       reference,
       type: 'transfer',
       fromUserId: req.auth.user.id,
@@ -386,8 +404,9 @@ app.get(
   '/wallet/transactions',
   authenticate,
   requirePermission('read'),
-  (req, res) => {
-    const entries = store.listTransactionsForUser(req.auth.user.id).map((tx) => {
+  async (req, res) => {
+    const txs = await store.listTransactionsForUser(req.auth.user.id);
+    const entries = txs.map((tx) => {
       const direction =
         tx.type === 'transfer'
           ? tx.fromUserId === req.auth.user.id
@@ -400,7 +419,7 @@ app.get(
         amount: tx.amount,
         status: tx.status,
         direction,
-        created_at: tx.createdAt,
+        created_at: tx.createdAt || tx.updatedAt,
       };
     });
     return res.json(entries);
