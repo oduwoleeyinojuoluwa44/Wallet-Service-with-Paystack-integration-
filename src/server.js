@@ -154,12 +154,14 @@ app.get('/auth/google', (req, res) => {
   const redirectUri =
     config.googleRedirectUri ||
     `${req.protocol}://${req.get('host')}/auth/google/callback`;
+  const scope =
+    'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
   const authUrl = config.googleClientId
     ? `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
         config.googleClientId,
       )}&redirect_uri=${encodeURIComponent(
         redirectUri,
-      )}&response_type=token&scope=openid%20email%20profile`
+      )}&response_type=token&scope=${encodeURIComponent(scope)}`
     : null;
 
   if (req.query.redirect === 'true' && authUrl) {
