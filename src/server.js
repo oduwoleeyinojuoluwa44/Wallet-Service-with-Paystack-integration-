@@ -15,6 +15,7 @@ const { apiSpec } = require('./openapi');
 const swaggerUi = require('swagger-ui-express');
 
 const app = express();
+app.set('trust proxy', true);
 
 // Use raw body for Paystack webhook so we can verify the signature.
 app.post(
@@ -85,8 +86,17 @@ app.get('/config/public', (req, res) => {
 });
 
 // Swagger/OpenAPI docs
+function getHostUrl(req) {
+  const protoHeader = req.headers['x-forwarded-proto'];
+  const proto = (protoHeader && protoHeader.split(',')[0].trim()) || req.protocol || 'http';
+  const host = req.get('host');
+  const normalizedProto =
+    proto === 'http' && host && host.includes('railway.app') ? 'https' : proto;
+  return `${normalizedProto}://${host}`;
+}
+
 function buildSpec(req) {
-  const hostUrl = `${req.protocol}://${req.get('host')}`;
+  const hostUrl = getHostUrl(req);
   return { ...apiSpec, servers: [{ url: hostUrl }] };
 }
 
