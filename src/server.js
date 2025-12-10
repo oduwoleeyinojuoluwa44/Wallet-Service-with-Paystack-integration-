@@ -152,6 +152,10 @@ app.get('/auth/google', (req, res) => {
       )}&response_type=token&scope=openid%20email%20profile`
     : null;
 
+  if (req.query.redirect === 'true' && authUrl) {
+    return res.redirect(authUrl);
+  }
+
   return res.json({
     auth_url: authUrl,
     redirect_uri: redirectUri,

@@ -31,6 +31,15 @@ const apiSpec = {
     '/auth/google': {
       get: {
         summary: 'Get Google auth URL',
+        parameters: [
+          {
+            name: 'redirect',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', enum: ['true', 'false'], default: 'false' },
+            description: 'If true and auth_url exists, 302 redirect to Google consent instead of returning JSON.',
+          },
+        ],
         responses: {
           200: {
             description: 'Auth URL',
