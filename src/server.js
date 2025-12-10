@@ -11,6 +11,8 @@ const {
 const store = require('./store');
 const { initializeDeposit, verifySignature } = require('./paystack');
 const { initDb } = require('./db');
+const { apiSpec } = require('./openapi');
+const swaggerUi = require('swagger-ui-express');
 
 const app = express();
 
@@ -81,6 +83,10 @@ app.get('/config/public', (req, res) => {
     googleClientId: config.googleClientId || null,
   });
 });
+
+// Swagger/OpenAPI docs
+app.get('/openapi.json', (req, res) => res.json(apiSpec));
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(apiSpec));
 
 function generateReference(prefix) {
   let reference;
